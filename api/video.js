@@ -34,9 +34,10 @@ export default async function handler(req, res) {
           model: "happyhorse-1.0-t2v",
           input: { prompt },
           parameters: {
-            resolution: "720P",
-            duration: 5,
-          },
+  resolution: "720P",
+  duration: 5,
+  audio_setting: "auto",
+},
         }),
       }
     );
