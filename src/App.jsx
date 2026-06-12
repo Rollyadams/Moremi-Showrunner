@@ -333,7 +333,7 @@ async function callQwen(apiKey, systemPrompt, userPrompt) {
 }
 
 async function generateVideoShot(apiKey, prompt) {
-  const res = await fetch(`${QWEN_BASE}/video/generations`, {
+  const res = await fetch(`/api/video`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
