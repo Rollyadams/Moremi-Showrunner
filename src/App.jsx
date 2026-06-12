@@ -1,9 +1,7 @@
-
 import { useState } from "react";
 
 const QWEN_BASE = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 
-// ── ERA DEFINITIONS ──────────────────────────────────────────────────────────
 const ERAS = {
   ancient: {
     id: "ancient",
@@ -12,12 +10,9 @@ const ERAS = {
     icon: "🔥",
     tagline: "The queen who walked into the enemy's hands to save her people.",
     accent: "#C4622D",
-    glow: "#8B3A1A",
     bg: "#0A0703",
     surface: "#160E05",
-    moodPrompt: `cinematic 12th century Yoruba Nigeria, torchlight, dark raffia grass, 
-ancient Ile-Ife palace, sacred Esinmirin River, warriors in bamboo-leaf cloaks, 
-dramatic shadows, high-contrast, film grain, epic historical drama`,
+    moodPrompt: `cinematic 12th century Yoruba Nigeria, torchlight, dark raffia grass, ancient Ile-Ife palace, sacred Esinmirin River, warriors in bamboo-leaf cloaks, dramatic shadows, high-contrast, film grain, epic historical drama`,
     systemPrompt: `You are a master Nigerian screenwriter specializing in Yoruba epic historical drama.
 The story: Moremi Ajasoro, Queen of Ile-Ife (12th century), allows herself to be captured 
 by the mysterious Igbo warriors — terrifying figures in cloaks of dry bamboo, grass and raffia 
@@ -34,12 +29,9 @@ Write with weight, poetry, and cultural authenticity. Use Yoruba honorifics wher
     icon: "🗿",
     tagline: "Her sacrifice stands 42 feet tall — the tallest statue in Nigeria.",
     accent: "#4A90D9",
-    glow: "#1A4A7A",
     bg: "#050810",
     surface: "#0A0F1A",
-    moodPrompt: `modern Nigeria 2026, cinematic, the 42-foot Moremi bronze statue in Ile-Ife, 
-Edi Festival crowds with burning torches, Moremi Hall at University of Lagos, 
-cyber-Yoruba aesthetic, golden hour, urban Nigeria meets ancient legacy`,
+    moodPrompt: `modern Nigeria 2026, cinematic, the 42-foot Moremi bronze statue in Ile-Ife, Edi Festival crowds with burning torches, Moremi Hall at University of Lagos, cyber-Yoruba aesthetic, golden hour, urban Nigeria meets ancient legacy`,
     systemPrompt: `You are a Nigerian documentary filmmaker and screenwriter.
 The subject: Moremi Ajasoro's living legacy in modern Nigeria.
 Key facts to weave in:
@@ -58,8 +50,62 @@ const STAGES = [
   { id: "final", label: "Final Cut", icon: "✨" },
 ];
 
+// ── API HELPERS ───────────────────────────────────────────────────────────────
+
+async function callQwen(apiKey, systemPrompt, userPrompt) {
+  const res = await fetch(`${QWEN_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "qwen-max",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 2000,
+    }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.choices[0].message.content;
+}
+
+async function createVideoTask(apiKey, prompt) {
+  const res = await fetch("/api/video", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prompt }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(JSON.stringify(data.error));
+  return data?.output?.task_id;
+}
+
+async function pollVideoTask(apiKey, taskId, maxAttempts = 20) {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, 8000));
+    const res = await fetch(`/api/video?taskId=${taskId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    const data = await res.json();
+    const status = data?.output?.task_status;
+    if (status === "SUCCEEDED") {
+      return data?.output?.video_url || data?.output?.results?.[0]?.url || null;
+    }
+    if (status === "FAILED") throw new Error("Video generation failed");
+  }
+  return null; // timed out but don't crash
+}
+
 // ── STYLES ────────────────────────────────────────────────────────────────────
-const base = {
+
+const S = {
   app: (era) => ({
     minHeight: "100vh",
     background: era ? ERAS[era].bg : "#0A0703",
@@ -101,27 +147,24 @@ const base = {
     margin: "24px auto",
     borderRadius: "2px",
   }),
-};
-
-const eraSelect = {
-  prompt: {
-    fontSize: "12px",
+  eraPrompt: {
+    fontSize: "11px",
     fontFamily: "monospace",
     letterSpacing: "0.15em",
-    color: "#7A6A58",
+    color: "#5A4A38",
     textTransform: "uppercase",
     marginBottom: "16px",
   },
-  grid: {
+  eraGrid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "12px",
     maxWidth: "440px",
-    margin: "0 auto",
+    margin: "0 auto 24px",
   },
-  card: (era, selected) => ({
-    background: selected ? ERAS[era].surface : "transparent",
-    border: `1px solid ${selected ? ERAS[era].accent : "#2A1E10"}`,
+  eraCard: (eraId, selected) => ({
+    background: selected ? ERAS[eraId].surface : "transparent",
+    border: `1px solid ${selected ? ERAS[eraId].accent : "#2A1E10"}`,
     borderRadius: "12px",
     padding: "20px 16px",
     cursor: "pointer",
@@ -129,31 +172,28 @@ const eraSelect = {
     transition: "all 0.25s ease",
     transform: selected ? "scale(1.02)" : "scale(1)",
   }),
-  cardIcon: { fontSize: "28px", marginBottom: "8px" },
-  cardLabel: (era, selected) => ({
+  eraIcon: { fontSize: "28px", marginBottom: "8px" },
+  eraLabel: (eraId, selected) => ({
     fontSize: "14px",
     fontWeight: "700",
-    color: selected ? ERAS[era].accent : "#7A6A58",
+    color: selected ? ERAS[eraId].accent : "#7A6A58",
     marginBottom: "4px",
   }),
-  cardPeriod: {
+  eraPeriod: {
     fontSize: "11px",
     fontFamily: "monospace",
     color: "#5A4A38",
   },
-};
-
-const form = {
-  wrap: {
+  formWrap: {
     maxWidth: "480px",
     margin: "0 auto",
     display: "flex",
     flexDirection: "column",
     gap: "12px",
   },
-  apiInput: (accent) => ({
+  apiInput: {
     background: "#0D0A07",
-    border: `1px solid #2A1E10`,
+    border: "1px solid #2A1E10",
     borderRadius: "8px",
     padding: "12px 16px",
     color: "#F0E6D3",
@@ -161,11 +201,9 @@ const form = {
     fontFamily: "monospace",
     outline: "none",
     width: "100%",
-  }),
+  },
   btn: (accent, disabled) => ({
-    background: disabled
-      ? "#1A1208"
-      : `linear-gradient(135deg, ${accent}, ${accent}99)`,
+    background: disabled ? "#1A1208" : `linear-gradient(135deg, ${accent}, ${accent}99)`,
     border: `1px solid ${disabled ? "#2A1E10" : accent}`,
     borderRadius: "8px",
     padding: "16px 24px",
@@ -174,22 +212,46 @@ const form = {
     fontWeight: "700",
     cursor: disabled ? "not-allowed" : "pointer",
     letterSpacing: "0.05em",
-    transition: "opacity 0.2s",
     fontFamily: "'Georgia', serif",
   }),
-};
-
-const pipeline = {
-  wrap: {
+  errorBox: {
+    background: "#120505",
+    border: "1px solid #6B1A1A",
+    borderRadius: "8px",
+    padding: "12px 16px",
+    fontSize: "13px",
+    color: "#FF7070",
+    fontFamily: "monospace",
+    marginTop: "12px",
+    maxWidth: "480px",
+    marginLeft: "auto",
+    marginRight: "auto",
+  },
+  pipeline: {
     maxWidth: "580px",
     margin: "0 auto",
-    padding: "0 16px 40px",
+    padding: "0 16px 60px",
   },
+  eraBadge: (accent, surface) => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    background: surface,
+    border: `1px solid ${accent}44`,
+    borderRadius: "20px",
+    padding: "6px 16px",
+    marginBottom: "8px",
+  }),
+  eraBadgeText: (accent) => ({
+    fontSize: "12px",
+    fontFamily: "monospace",
+    color: accent,
+  }),
   stagesRow: {
     display: "flex",
     justifyContent: "center",
-    gap: "12px",
-    margin: "32px 0 24px",
+    gap: "16px",
+    margin: "28px 0 24px",
   },
   dot: (status, accent) => ({
     width: "36px",
@@ -199,9 +261,8 @@ const pipeline = {
     alignItems: "center",
     justifyContent: "center",
     fontSize: "15px",
-    flexShrink: 0,
     background:
-      status === "done" ? "#2A5C3A" : status === "active" ? accent + "33" : "#0D0A07",
+      status === "done" ? "#2A5C3A" : status === "active" ? `${accent}33` : "#0D0A07",
     border: `1.5px solid ${
       status === "done" ? "#4CAF7D" : status === "active" ? accent : "#2A1E10"
     }`,
@@ -210,14 +271,13 @@ const pipeline = {
   dotLabel: (status, accent) => ({
     fontSize: "10px",
     fontFamily: "monospace",
-    color:
-      status === "done" ? "#4CAF7D" : status === "active" ? accent : "#4A3A28",
+    color: status === "done" ? "#4CAF7D" : status === "active" ? accent : "#4A3A28",
     marginTop: "4px",
     textAlign: "center",
   }),
   scroll: (accent) => ({
     background: "#0D0A07",
-    border: `1px solid #2A1E10`,
+    border: "1px solid #2A1E10",
     borderLeft: `3px solid ${accent}`,
     borderRadius: "10px",
     padding: "18px 16px",
@@ -257,7 +317,14 @@ const pipeline = {
     alignItems: "center",
     justifyContent: "center",
     fontSize: "24px",
+    overflow: "hidden",
   }),
+  shotVideo: {
+    width: "100%",
+    aspectRatio: "16/9",
+    objectFit: "cover",
+    display: "block",
+  },
   shotMeta: {
     padding: "8px 10px",
     fontSize: "11px",
@@ -295,68 +362,28 @@ const pipeline = {
     fontFamily: "monospace",
     color: "#5A4A38",
   },
-  errorBox: {
-    background: "#120505",
-    border: "1px solid #6B1A1A",
-    borderRadius: "8px",
-    padding: "12px 16px",
+  resetBtn: (accent) => ({
+    background: "transparent",
+    border: `1px solid ${accent}55`,
+    borderRadius: "6px",
+    padding: "10px 20px",
+    color: accent,
     fontSize: "13px",
-    color: "#FF7070",
+    cursor: "pointer",
     fontFamily: "monospace",
-    marginTop: "12px",
-    maxWidth: "480px",
-    marginLeft: "auto",
-    marginRight: "auto",
-  },
+    marginTop: "16px",
+  }),
 };
 
-// ── API HELPERS ───────────────────────────────────────────────────────────────
-async function callQwen(apiKey, systemPrompt, userPrompt) {
-  const res = await fetch(`${QWEN_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "qwen-max",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: 2000,
-    }),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.choices[0].message.content;
-}
+// ── COMPONENT ─────────────────────────────────────────────────────────────────
 
-async function generateVideoShot(apiKey, prompt) {
-  const res = await fetch(`/api/video`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "happyhorse-1.0-t2v",
-      prompt,
-      size: "1280*720",
-    }),
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return data;
-}
-
-// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function MoremiShowrunner() {
   const [selectedEra, setSelectedEra] = useState(null);
   const [apiKey, setApiKey] = useState("");
   const [stage, setStage] = useState(null);
   const [results, setResults] = useState({});
   const [shots, setShots] = useState([]);
+  const [videoUrls, setVideoUrls] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -380,11 +407,12 @@ export default function MoremiShowrunner() {
     setLoading(true);
     setResults({});
     setShots([]);
+    setVideoUrls([]);
 
     const E = ERAS[selectedEra];
 
     try {
-      // STEP 1 — Script
+      // ── STEP 1: Script ──
       setStage("script");
       const script = await callQwen(
         apiKey,
@@ -403,28 +431,27 @@ SCENE 3: [Title]
       );
       setResults((r) => ({ ...r, script }));
 
-      // STEP 2 — Storyboard
+      // ── STEP 2: Storyboard ──
       setStage("storyboard");
       const storyboard = await callQwen(
         apiKey,
-        `You are a storyboard artist for Nigerian epic cinema. 
+        `You are a storyboard artist for Nigerian epic cinema.
 Convert scripts into AI video generation prompts.
-Visual style for ${E.label}: ${E.moodPrompt}
+Visual style: ${E.moodPrompt}
 Each shot must include: camera angle, lighting, character description, setting detail.`,
         `Break this script into exactly 4 video generation prompts.
 Each prompt will be sent directly to an AI video model.
 Format strictly as:
 SHOT 1: [one detailed sentence — camera, lighting, characters, setting, mood]
-SHOT 2: [...]
-SHOT 3: [...]
-SHOT 4: [...]
+SHOT 2: [one detailed sentence]
+SHOT 3: [one detailed sentence]
+SHOT 4: [one detailed sentence]
 
 Script:
 ${script}`
       );
       setResults((r) => ({ ...r, storyboard }));
 
-      // Parse shot lines
       const shotLines = storyboard
         .split("\n")
         .filter((l) => /^SHOT \d+:/i.test(l.trim()))
@@ -432,31 +459,33 @@ ${script}`
         .slice(0, 4);
       setShots(shotLines);
 
-      // STEP 3 — Video generation
+      // ── STEP 3: Video generation (async + poll) ──
       setStage("video");
-      const videoResults = [];
+      const urls = [];
+
       for (let i = 0; i < shotLines.length; i++) {
         const fullPrompt = `${E.moodPrompt}. ${shotLines[i]}`;
         try {
-          const vid = await generateVideoShot(apiKey, fullPrompt);
-          videoResults.push({ prompt: shotLines[i], data: vid, status: "generated" });
+          const taskId = await createVideoTask(apiKey, fullPrompt);
+          if (taskId) {
+            // Poll for result
+            const videoUrl = await pollVideoTask(apiKey, taskId);
+            urls.push(videoUrl || null);
+          } else {
+            urls.push(null);
+          }
         } catch (e) {
-          videoResults.push({
-            prompt: shotLines[i],
-            data: null,
-            status: "queued",
-            note: e.message?.slice(0, 60) || "Queued — check QwenCloud dashboard",
-          });
+          urls.push(null);
         }
-        setResults((r) => ({ ...r, videoResults: [...videoResults] }));
+        setVideoUrls([...urls]);
       }
 
-      // STEP 4 — Final synopsis
+      // ── STEP 4: Synopsis ──
       setStage("final");
       const synopsis = await callQwen(
         apiKey,
         `You write poetic, cinematic film descriptions for Nigerian streaming platforms.`,
-        `Write a 2–3 sentence synopsis for this ${E.label} Moremi drama 
+        `Write a 2–3 sentence synopsis for this ${E.label} Moremi drama
 as if it's appearing on Netflix Nigeria. Make it powerful and poetic.`
       );
       setResults((r) => ({ ...r, synopsis }));
@@ -473,12 +502,15 @@ as if it's appearing on Netflix Nigeria. Make it powerful and poetic.`
     setStage(null);
     setResults({});
     setShots([]);
+    setVideoUrls([]);
     setError("");
     setLoading(false);
   }
 
+  const successfulVideos = videoUrls.filter(Boolean).length;
+
   return (
-    <div style={base.app(selectedEra)}>
+    <div style={S.app(selectedEra)}>
       <style>{`
         @keyframes pulse {
           0%,100% { opacity:1; transform:scale(1); }
@@ -487,96 +519,82 @@ as if it's appearing on Netflix Nigeria. Make it powerful and poetic.`
         * { box-sizing:border-box; }
         input::placeholder { color:#3A2E22; }
         button:active { opacity:0.8; }
-        ::-webkit-scrollbar { width:4px; }
-        ::-webkit-scrollbar-track { background:#0A0703; }
-        ::-webkit-scrollbar-thumb { background:#3A2E22; border-radius:2px; }
       `}</style>
 
       {/* ── HERO ── */}
-      <div style={base.hero}>
-        <div style={base.eyebrow(accent)}>
-          AI Showrunner · QwenCloud Hackathon 2026
-        </div>
-        <h1 style={base.title}>
+      <div style={S.hero}>
+        <div style={S.eyebrow(accent)}>AI Showrunner · QwenCloud Hackathon 2026</div>
+        <h1 style={S.title}>
           Moremi<br />
-          <span style={base.italic(accent)}>Ajasoro</span>
+          <span style={S.italic(accent)}>Ajasoro</span>
         </h1>
-        <p style={base.subtitle}>
+        <p style={S.subtitle}>
           {era ? era.tagline : "Queen of Ile-Ife. Spy. Sacrifice. Eternal."}
         </p>
-        <div style={base.divider(accent)} />
+        <div style={S.divider(accent)} />
 
-        {/* ── ERA SELECTOR ── */}
+        {/* Era selector — only before running */}
         {!stage && (
-          <div style={{ marginBottom: "28px" }}>
-            <div style={eraSelect.prompt}>Choose your era</div>
-            <div style={eraSelect.grid}>
+          <>
+            <div style={S.eraPrompt}>Choose your era</div>
+            <div style={S.eraGrid}>
               {Object.values(ERAS).map((e) => (
                 <div
                   key={e.id}
-                  style={eraSelect.card(e.id, selectedEra === e.id)}
+                  style={S.eraCard(e.id, selectedEra === e.id)}
                   onClick={() => { setSelectedEra(e.id); setError(""); }}
                 >
-                  <div style={eraSelect.cardIcon}>{e.icon}</div>
-                  <div style={eraSelect.cardLabel(e.id, selectedEra === e.id)}>
-                    {e.label}
-                  </div>
-                  <div style={eraSelect.cardPeriod}>{e.period}</div>
+                  <div style={S.eraIcon}>{e.icon}</div>
+                  <div style={S.eraLabel(e.id, selectedEra === e.id)}>{e.label}</div>
+                  <div style={S.eraPeriod}>{e.period}</div>
                 </div>
               ))}
             </div>
-          </div>
+
+            <div style={S.formWrap}>
+              <input
+                style={S.apiInput}
+                type="password"
+                placeholder="QwenCloud API key  (sk-ws-...)"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+              />
+              <button
+                style={S.btn(accent, loading || !selectedEra || !apiKey)}
+                onClick={runAgent}
+                disabled={loading || !selectedEra || !apiKey}
+              >
+                {loading ? "Agent running…" : `▶ Generate ${era?.label || "Drama"}`}
+              </button>
+            </div>
+          </>
         )}
 
-        {/* ── ERA BADGE (while running) ── */}
+        {/* Era badge while running */}
         {stage && era && (
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: "8px",
-            background: era.surface, border: `1px solid ${accent}44`,
-            borderRadius: "20px", padding: "6px 16px", marginBottom: "8px",
-          }}>
+          <div style={S.eraBadge(accent, era.surface)}>
             <span>{era.icon}</span>
-            <span style={{ fontSize: "12px", fontFamily: "monospace", color: accent }}>
+            <span style={S.eraBadgeText(accent)}>
               {era.label} · {era.period}
             </span>
           </div>
         )}
 
-        {/* ── FORM ── */}
-        {!stage && (
-          <div style={form.wrap}>
-            <input
-              style={form.apiInput(accent)}
-              type="password"
-              placeholder="QwenCloud API key  (sk-ws-...)"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-            <button
-              style={form.btn(accent, loading || !selectedEra)}
-              onClick={runAgent}
-              disabled={loading || !selectedEra}
-            >
-              {loading ? "Agent running…" : `▶ Generate ${era?.label || "Drama"}`}
-            </button>
-          </div>
-        )}
-
-        {error && <div style={pipeline.errorBox}>⚠ {error}</div>}
+        {error && <div style={S.errorBox}>⚠ {error}</div>}
       </div>
 
       {/* ── PIPELINE ── */}
       {stage && (
-        <div style={pipeline.wrap}>
+        <div style={S.pipeline}>
 
           {/* Stage dots */}
-          <div style={pipeline.stagesRow}>
+          <div style={S.stagesRow}>
             {STAGES.map((s) => {
               const status = getStageStatus(s.id);
               return (
                 <div key={s.id} style={{ textAlign: "center" }}>
-                  <div style={pipeline.dot(status, accent)}>{s.icon}</div>
-                  <div style={pipeline.dotLabel(status, accent)}>{s.label}</div>
+                  <div style={S.dot(status, accent)}>{s.icon}</div>
+                  <div style={S.dotLabel(status, accent)}>{s.label}</div>
                 </div>
               );
             })}
@@ -584,54 +602,60 @@ as if it's appearing on Netflix Nigeria. Make it powerful and poetic.`
 
           {/* Script */}
           {results.script && (
-            <div style={pipeline.scroll(accent)}>
-              <div style={pipeline.scrollTitle(accent)}>📜 Script</div>
-              <div style={pipeline.scrollContent}>{results.script}</div>
+            <div style={S.scroll(accent)}>
+              <div style={S.scrollTitle(accent)}>📜 Script</div>
+              <div style={S.scrollContent}>{results.script}</div>
             </div>
           )}
 
           {/* Storyboard */}
           {results.storyboard && (
-            <div style={pipeline.scroll("#D4A017")}>
-              <div style={pipeline.scrollTitle("#D4A017")}>🎬 Storyboard</div>
-              <div style={pipeline.scrollContent}>{results.storyboard}</div>
+            <div style={S.scroll("#D4A017")}>
+              <div style={S.scrollTitle("#D4A017")}>🎬 Storyboard</div>
+              <div style={S.scrollContent}>{results.storyboard}</div>
             </div>
           )}
 
           {/* Video shots */}
           {shots.length > 0 && (
             <>
-              <div style={{
-                fontSize: "10px", fontFamily: "monospace", letterSpacing: "0.18em",
-                color: accent, textTransform: "uppercase", marginBottom: "10px",
-              }}>
+              <div style={{ ...S.scrollTitle(accent), marginBottom: "10px" }}>
                 🎥 Video Generation
+                {stage === "video" && (
+                  <span style={{ color: "#D4A017", marginLeft: "8px" }}>
+                    — polling results…
+                  </span>
+                )}
               </div>
-              <div style={pipeline.shotGrid}>
+              <div style={S.shotGrid}>
                 {shots.map((shot, i) => {
-                  const v = results.videoResults?.[i];
+                  const url = videoUrls[i];
+                  const pending = i >= videoUrls.length;
                   return (
-                    <div key={i} style={pipeline.shotCard}>
-                      <div style={pipeline.shotThumb(accent)}>
-                        {v?.status === "generated" ? "🎞" : v ? "⏳" : "🔄"}
-                      </div>
-                      <div style={pipeline.shotMeta}>
+                    <div key={i} style={S.shotCard}>
+                      {url ? (
+                        <video
+                          style={S.shotVideo}
+                          src={url}
+                          controls
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                        />
+                      ) : (
+                        <div style={S.shotThumb(accent)}>
+                          {pending ? "🔄" : videoUrls[i] === null ? "⚠️" : "⏳"}
+                        </div>
+                      )}
+                      <div style={S.shotMeta}>
                         <div style={{ color: accent, marginBottom: "2px" }}>
                           Shot {i + 1}
+                          {url && <span style={{ color: "#4CAF7D" }}> ✓</span>}
                         </div>
                         <div style={{ fontSize: "10px", color: "#3A2E22" }}>
-                          {shot.slice(0, 55)}…
+                          {shot.slice(0, 60)}…
                         </div>
-                        {v?.data?.id && (
-                          <div style={{ color: "#4CAF7D", marginTop: "2px" }}>
-                            ✓ {v.data.id.slice(0, 10)}…
-                          </div>
-                        )}
-                        {v?.note && (
-                          <div style={{ color: "#D4A017", marginTop: "2px" }}>
-                            {v.note.slice(0, 50)}
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
@@ -640,30 +664,18 @@ as if it's appearing on Netflix Nigeria. Make it powerful and poetic.`
             </>
           )}
 
-          {/* Final */}
+          {/* Final synopsis */}
           {results.synopsis && (
-            <div style={pipeline.finalCard(accent)}>
-              <div style={pipeline.finalTitle(accent)}>
+            <div style={S.finalCard(accent)}>
+              <div style={S.finalTitle(accent)}>
                 {era?.icon} Moremi Ajasoro — {era?.label}
               </div>
-              <p style={pipeline.finalText}>{results.synopsis}</p>
-              <div style={pipeline.badge}>
-                Script ✓ · Storyboard ✓ · {shots.length} shots · Synopsis ✓
+              <p style={S.finalText}>{results.synopsis}</p>
+              <div style={S.badge}>
+                Script ✓ · Storyboard ✓ · {successfulVideos}/{shots.length} videos · Synopsis ✓
               </div>
-              <div style={{ marginTop: "20px" }}>
-                <button
-                  style={{
-                    background: "transparent",
-                    border: `1px solid ${accent}55`,
-                    borderRadius: "6px",
-                    padding: "10px 20px",
-                    color: accent,
-                    fontSize: "13px",
-                    cursor: "pointer",
-                    fontFamily: "monospace",
-                  }}
-                  onClick={reset}
-                >
+              <div>
+                <button style={S.resetBtn(accent)} onClick={reset}>
                   ↩ Generate another era
                 </button>
               </div>
