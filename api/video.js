@@ -36,7 +36,6 @@ export default async function handler(req, res) {
           parameters: {
   resolution: "720P",
   duration: 5,
-  audio_setting: "auto",
 },
         }),
       }
