@@ -7,7 +7,6 @@ export default async function handler(req, res) {
 
   const auth = req.headers.authorization;
 
-  // Poll task status
   if (req.method === "GET") {
     const { taskId } = req.query;
     const r = await fetch(
@@ -18,7 +17,6 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
   }
 
-  // Create video task
   try {
     const { prompt } = req.body;
     const response = await fetch(
@@ -34,9 +32,9 @@ export default async function handler(req, res) {
           model: "happyhorse-1.0-t2v",
           input: { prompt },
           parameters: {
-  resolution: "720P",
-  duration: 5,
-},
+            resolution: "720P",
+            duration: 5,
+          },
         }),
       }
     );
