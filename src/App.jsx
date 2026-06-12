@@ -6,8 +6,8 @@ const ERAS = {
   ancient: {
     id: "ancient",
     label: "Ancient Era",
-    period: "12th Century · Ile-Ife",
-    icon: "🔥",
+    period: "12th Century \u00b7 Ile-Ife",
+    icon: "\ud83d\udd25",
     tagline: "The queen who walked into the enemy's hands to save her people.",
     accent: "#C4622D",
     bg: "#0A0703",
@@ -15,19 +15,19 @@ const ERAS = {
     moodPrompt: `cinematic 12th century Yoruba Nigeria, torchlight, dark raffia grass, ancient Ile-Ife palace, sacred Esinmirin River, warriors in bamboo-leaf cloaks, dramatic shadows, high-contrast, film grain, epic historical drama`,
     systemPrompt: `You are a master Nigerian screenwriter specializing in Yoruba epic historical drama.
 The story: Moremi Ajasoro, Queen of Ile-Ife (12th century), allows herself to be captured 
-by the mysterious Igbo warriors — terrifying figures in cloaks of dry bamboo, grass and raffia 
+by the mysterious Igbo warriors \u2014 terrifying figures in cloaks of dry bamboo, grass and raffia 
 fiber that her people believe are spirits. Living among them, she uncovers the truth: they are 
 human. She escapes, teaches her people to fight back with burning torches (Olojuwa fire). 
-Ile-Ife is saved. But Moremi made a vow to the Esinmirin River goddess — whatever she demands. 
+Ile-Ife is saved. But Moremi made a vow to the Esinmirin River goddess \u2014 whatever she demands. 
 The goddess demands her only son, Oluorogbo. Moremi sacrifices him.
 Write with weight, poetry, and cultural authenticity. Use Yoruba honorifics where natural.`,
   },
   modern: {
     id: "modern",
     label: "Modern Era",
-    period: "Present Day · Nigeria 2026",
-    icon: "🗿",
-    tagline: "Her sacrifice stands 42 feet tall — the tallest statue in Nigeria.",
+    period: "Present Day \u00b7 Nigeria 2026",
+    icon: "\ud83d\uddff",
+    tagline: "Her sacrifice stands 42 feet tall \u2014 the tallest statue in Nigeria.",
     accent: "#4A90D9",
     bg: "#050810",
     surface: "#0A0F1A",
@@ -35,8 +35,8 @@ Write with weight, poetry, and cultural authenticity. Use Yoruba honorifics wher
     systemPrompt: `You are a Nigerian documentary filmmaker and screenwriter.
 The subject: Moremi Ajasoro's living legacy in modern Nigeria.
 Key facts to weave in:
-- In 2016, the Ooni of Ife unveiled a 42-foot bronze Moremi Statue — tallest in Nigeria, 4th tallest in Africa
-- Every year, the Edi Festival in Ile-Ife reenacts her story — people light traditional torches (Olojuwa)
+- In 2016, the Ooni of Ife unveiled a 42-foot bronze Moremi Statue \u2014 tallest in Nigeria, 4th tallest in Africa
+- Every year, the Edi Festival in Ile-Ife reenacts her story \u2014 people light traditional torches (Olojuwa)
 - The most famous female residential halls at UNILAG and OAU are named Moremi Hall
 - Her story bridges 12th century sacrifice and 21st century Nigerian female empowerment
 Write with cinematic power, connecting ancient sacrifice to modern Nigerian identity.`,
@@ -44,13 +44,13 @@ Write with cinematic power, connecting ancient sacrifice to modern Nigerian iden
 };
 
 const STAGES = [
-  { id: "script", label: "Script", icon: "📜" },
-  { id: "storyboard", label: "Storyboard", icon: "🎬" },
-  { id: "video", label: "Video Shots", icon: "🎥" },
-  { id: "final", label: "Final Cut", icon: "✨" },
+  { id: "script", label: "Script", icon: "\ud83d\udcdc" },
+  { id: "storyboard", label: "Storyboard", icon: "\ud83c\udfac" },
+  { id: "video", label: "Video Shots", icon: "\ud83c\udfa5" },
+  { id: "final", label: "Final Cut", icon: "\u2728" },
 ];
 
-// ── API HELPERS ───────────────────────────────────────────────────────────────
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function callQwen(apiKey, systemPrompt, userPrompt) {
   const res = await fetch(`${QWEN_BASE}/chat/completions`, {
@@ -87,23 +87,26 @@ async function createVideoTask(apiKey, prompt) {
   return data?.output?.task_id;
 }
 
-async function pollVideoTask(apiKey, taskId, maxAttempts = 20) {
+async function pollVideoTask(apiKey, taskId, maxAttempts = 24) {
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, 8000));
+    await sleep(8000);
     const res = await fetch(`/api/video?taskId=${taskId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     const data = await res.json();
     const status = data?.output?.task_status;
     if (status === "SUCCEEDED") {
-      return data?.output?.video_url || data?.output?.results?.[0]?.url || null;
+      return (
+        data?.output?.video_url ||
+        data?.output?.results?.[0]?.url ||
+        data?.output?.results?.[0]?.video_url ||
+        null
+      );
     }
-    if (status === "FAILED") throw new Error("Video generation failed");
+    if (status === "FAILED") throw new Error("Video task failed");
   }
-  return null; // timed out but don't crash
+  return null;
 }
-
-// ── STYLES ────────────────────────────────────────────────────────────────────
 
 const S = {
   app: (era) => ({
@@ -113,10 +116,7 @@ const S = {
     fontFamily: "'Georgia', serif",
     transition: "background 0.6s ease",
   }),
-  hero: {
-    textAlign: "center",
-    padding: "48px 24px 40px",
-  },
+  hero: { textAlign: "center", padding: "48px 24px 40px" },
   eyebrow: (accent) => ({
     fontSize: "10px",
     letterSpacing: "0.25em",
@@ -163,526 +163,4 @@ const S = {
     margin: "0 auto 24px",
   },
   eraCard: (eraId, selected) => ({
-    background: selected ? ERAS[eraId].surface : "transparent",
-    border: `1px solid ${selected ? ERAS[eraId].accent : "#2A1E10"}`,
-    borderRadius: "12px",
-    padding: "20px 16px",
-    cursor: "pointer",
-    textAlign: "center",
-    transition: "all 0.25s ease",
-    transform: selected ? "scale(1.02)" : "scale(1)",
-  }),
-  eraIcon: { fontSize: "28px", marginBottom: "8px" },
-  eraLabel: (eraId, selected) => ({
-    fontSize: "14px",
-    fontWeight: "700",
-    color: selected ? ERAS[eraId].accent : "#7A6A58",
-    marginBottom: "4px",
-  }),
-  eraPeriod: {
-    fontSize: "11px",
-    fontFamily: "monospace",
-    color: "#5A4A38",
-  },
-  formWrap: {
-    maxWidth: "480px",
-    margin: "0 auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-  },
-  apiInput: {
-    background: "#0D0A07",
-    border: "1px solid #2A1E10",
-    borderRadius: "8px",
-    padding: "12px 16px",
-    color: "#F0E6D3",
-    fontSize: "13px",
-    fontFamily: "monospace",
-    outline: "none",
-    width: "100%",
-  },
-  btn: (accent, disabled) => ({
-    background: disabled ? "#1A1208" : `linear-gradient(135deg, ${accent}, ${accent}99)`,
-    border: `1px solid ${disabled ? "#2A1E10" : accent}`,
-    borderRadius: "8px",
-    padding: "16px 24px",
-    color: disabled ? "#5A4A38" : "#F0E6D3",
-    fontSize: "15px",
-    fontWeight: "700",
-    cursor: disabled ? "not-allowed" : "pointer",
-    letterSpacing: "0.05em",
-    fontFamily: "'Georgia', serif",
-  }),
-  errorBox: {
-    background: "#120505",
-    border: "1px solid #6B1A1A",
-    borderRadius: "8px",
-    padding: "12px 16px",
-    fontSize: "13px",
-    color: "#FF7070",
-    fontFamily: "monospace",
-    marginTop: "12px",
-    maxWidth: "480px",
-    marginLeft: "auto",
-    marginRight: "auto",
-  },
-  pipeline: {
-    maxWidth: "580px",
-    margin: "0 auto",
-    padding: "0 16px 60px",
-  },
-  eraBadge: (accent, surface) => ({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-    background: surface,
-    border: `1px solid ${accent}44`,
-    borderRadius: "20px",
-    padding: "6px 16px",
-    marginBottom: "8px",
-  }),
-  eraBadgeText: (accent) => ({
-    fontSize: "12px",
-    fontFamily: "monospace",
-    color: accent,
-  }),
-  stagesRow: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "16px",
-    margin: "28px 0 24px",
-  },
-  dot: (status, accent) => ({
-    width: "36px",
-    height: "36px",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "15px",
-    background:
-      status === "done" ? "#2A5C3A" : status === "active" ? `${accent}33` : "#0D0A07",
-    border: `1.5px solid ${
-      status === "done" ? "#4CAF7D" : status === "active" ? accent : "#2A1E10"
-    }`,
-    animation: status === "active" ? "pulse 1.4s ease-in-out infinite" : "none",
-  }),
-  dotLabel: (status, accent) => ({
-    fontSize: "10px",
-    fontFamily: "monospace",
-    color: status === "done" ? "#4CAF7D" : status === "active" ? accent : "#4A3A28",
-    marginTop: "4px",
-    textAlign: "center",
-  }),
-  scroll: (accent) => ({
-    background: "#0D0A07",
-    border: "1px solid #2A1E10",
-    borderLeft: `3px solid ${accent}`,
-    borderRadius: "10px",
-    padding: "18px 16px",
-    marginBottom: "12px",
-  }),
-  scrollTitle: (accent) => ({
-    fontSize: "10px",
-    fontFamily: "monospace",
-    letterSpacing: "0.18em",
-    color: accent,
-    textTransform: "uppercase",
-    marginBottom: "12px",
-  }),
-  scrollContent: {
-    fontSize: "14px",
-    lineHeight: 1.85,
-    color: "#D4C4B0",
-    whiteSpace: "pre-wrap",
-  },
-  shotGrid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "10px",
-    marginBottom: "12px",
-  },
-  shotCard: {
-    background: "#0D0A07",
-    border: "1px solid #2A1E10",
-    borderRadius: "10px",
-    overflow: "hidden",
-  },
-  shotThumb: (accent) => ({
-    width: "100%",
-    aspectRatio: "16/9",
-    background: `linear-gradient(135deg, ${accent}22, #0A0703)`,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "24px",
-    overflow: "hidden",
-  }),
-  shotVideo: {
-    width: "100%",
-    aspectRatio: "16/9",
-    objectFit: "cover",
-    display: "block",
-  },
-  shotMeta: {
-    padding: "8px 10px",
-    fontSize: "11px",
-    fontFamily: "monospace",
-    color: "#5A4A38",
-    lineHeight: 1.5,
-  },
-  finalCard: (accent) => ({
-    background: `linear-gradient(135deg, ${accent}18, #0A0703)`,
-    border: `1px solid ${accent}`,
-    borderRadius: "14px",
-    padding: "28px 20px",
-    textAlign: "center",
-  }),
-  finalTitle: (accent) => ({
-    fontSize: "22px",
-    fontWeight: "700",
-    color: accent,
-    marginBottom: "12px",
-    fontStyle: "italic",
-  }),
-  finalText: {
-    fontSize: "15px",
-    lineHeight: 1.8,
-    color: "#F0E6D3",
-    margin: "0 0 20px",
-  },
-  badge: {
-    display: "inline-block",
-    padding: "8px 16px",
-    background: "#0D0A07",
-    border: "1px solid #2A1E10",
-    borderRadius: "6px",
-    fontSize: "11px",
-    fontFamily: "monospace",
-    color: "#5A4A38",
-  },
-  resetBtn: (accent) => ({
-    background: "transparent",
-    border: `1px solid ${accent}55`,
-    borderRadius: "6px",
-    padding: "10px 20px",
-    color: accent,
-    fontSize: "13px",
-    cursor: "pointer",
-    fontFamily: "monospace",
-    marginTop: "16px",
-  }),
-};
-
-// ── COMPONENT ─────────────────────────────────────────────────────────────────
-
-export default function MoremiShowrunner() {
-  const [selectedEra, setSelectedEra] = useState(null);
-  const [apiKey, setApiKey] = useState("");
-  const [stage, setStage] = useState(null);
-  const [results, setResults] = useState({});
-  const [shots, setShots] = useState([]);
-  const [videoUrls, setVideoUrls] = useState([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const era = selectedEra ? ERAS[selectedEra] : null;
-  const accent = era?.accent || "#C4622D";
-
-  const getStageStatus = (id) => {
-    const order = ["script", "storyboard", "video", "final"];
-    if (stage === "done") return "done";
-    const cur = order.indexOf(stage);
-    const idx = order.indexOf(id);
-    if (idx < cur) return "done";
-    if (idx === cur) return "active";
-    return "idle";
-  };
-
-  async function runAgent() {
-    if (!apiKey.trim()) return setError("Paste your QwenCloud API key.");
-    if (!selectedEra) return setError("Choose an era first.");
-    setError("");
-    setLoading(true);
-    setResults({});
-    setShots([]);
-    setVideoUrls([]);
-
-    const E = ERAS[selectedEra];
-
-    try {
-      // ── STEP 1: Script ──
-      setStage("script");
-      const script = await callQwen(
-        apiKey,
-        E.systemPrompt,
-        `Write a powerful 3-scene short drama script for the ${E.label} of Moremi's story.
-Use the key story beats provided. Each scene should be vivid and cinematic.
-Format strictly as:
-SCENE 1: [Title]
-[Content]
-
-SCENE 2: [Title]
-[Content]
-
-SCENE 3: [Title]
-[Content]`
-      );
-      setResults((r) => ({ ...r, script }));
-
-      // ── STEP 2: Storyboard ──
-      setStage("storyboard");
-      const storyboard = await callQwen(
-        apiKey,
-        `You are a storyboard artist for Nigerian epic cinema.
-Convert scripts into AI video generation prompts.
-Visual style: ${E.moodPrompt}
-Each shot must include: camera angle, lighting, character description, setting detail.`,
-        `Break this script into exactly 4 video generation prompts.
-Each prompt will be sent directly to an AI video model.
-Format strictly as:
-SHOT 1: [one detailed sentence — camera, lighting, characters, setting, mood]
-SHOT 2: [one detailed sentence]
-SHOT 3: [one detailed sentence]
-SHOT 4: [one detailed sentence]
-
-Script:
-${script}`
-      );
-      setResults((r) => ({ ...r, storyboard }));
-
-      const shotLines = storyboard
-        .split("\n")
-        .filter((l) => /^SHOT \d+:/i.test(l.trim()))
-        .map((l) => l.replace(/^SHOT \d+:\s*/i, "").trim())
-        .slice(0, 4);
-      setShots(shotLines);
-
-      // ── STEP 3: Video generation (async + poll) ──
-      setStage("video");
-      const urls = [];
-
-      for (let i = 0; i < shotLines.length; i++) {
-        const fullPrompt = `${E.moodPrompt}. ${shotLines[i]}`;
-        try {
-          const taskId = await createVideoTask(apiKey, fullPrompt);
-          if (taskId) {
-            // Poll for result
-            const videoUrl = await pollVideoTask(apiKey, taskId);
-            urls.push(videoUrl || null);
-          } else {
-            urls.push(null);
-          }
-        } catch (e) {
-          urls.push(null);
-        }
-        setVideoUrls([...urls]);
-      }
-
-      // ── STEP 4: Synopsis ──
-      setStage("final");
-      const synopsis = await callQwen(
-        apiKey,
-        `You write poetic, cinematic film descriptions for Nigerian streaming platforms.`,
-        `Write a 2–3 sentence synopsis for this ${E.label} Moremi drama
-as if it's appearing on Netflix Nigeria. Make it powerful and poetic.`
-      );
-      setResults((r) => ({ ...r, synopsis }));
-      setStage("done");
-    } catch (e) {
-      setError(e.message);
-      setStage(null);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function reset() {
-    setStage(null);
-    setResults({});
-    setShots([]);
-    setVideoUrls([]);
-    setError("");
-    setLoading(false);
-  }
-
-  const successfulVideos = videoUrls.filter(Boolean).length;
-
-  return (
-    <div style={S.app(selectedEra)}>
-      <style>{`
-        @keyframes pulse {
-          0%,100% { opacity:1; transform:scale(1); }
-          50% { opacity:0.5; transform:scale(0.9); }
-        }
-        * { box-sizing:border-box; }
-        input::placeholder { color:#3A2E22; }
-        button:active { opacity:0.8; }
-      `}</style>
-
-      {/* ── HERO ── */}
-      <div style={S.hero}>
-        <div style={S.eyebrow(accent)}>AI Showrunner · QwenCloud Hackathon 2026</div>
-        <h1 style={S.title}>
-          Moremi<br />
-          <span style={S.italic(accent)}>Ajasoro</span>
-        </h1>
-        <p style={S.subtitle}>
-          {era ? era.tagline : "Queen of Ile-Ife. Spy. Sacrifice. Eternal."}
-        </p>
-        <div style={S.divider(accent)} />
-
-        {/* Era selector — only before running */}
-        {!stage && (
-          <>
-            <div style={S.eraPrompt}>Choose your era</div>
-            <div style={S.eraGrid}>
-              {Object.values(ERAS).map((e) => (
-                <div
-                  key={e.id}
-                  style={S.eraCard(e.id, selectedEra === e.id)}
-                  onClick={() => { setSelectedEra(e.id); setError(""); }}
-                >
-                  <div style={S.eraIcon}>{e.icon}</div>
-                  <div style={S.eraLabel(e.id, selectedEra === e.id)}>{e.label}</div>
-                  <div style={S.eraPeriod}>{e.period}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={S.formWrap}>
-              <input
-                style={S.apiInput}
-                type="password"
-                placeholder="QwenCloud API key  (sk-ws-...)"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <button
-                style={S.btn(accent, loading || !selectedEra || !apiKey)}
-                onClick={runAgent}
-                disabled={loading || !selectedEra || !apiKey}
-              >
-                {loading ? "Agent running…" : `▶ Generate ${era?.label || "Drama"}`}
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Era badge while running */}
-        {stage && era && (
-          <div style={S.eraBadge(accent, era.surface)}>
-            <span>{era.icon}</span>
-            <span style={S.eraBadgeText(accent)}>
-              {era.label} · {era.period}
-            </span>
-          </div>
-        )}
-
-        {error && <div style={S.errorBox}>⚠ {error}</div>}
-      </div>
-
-      {/* ── PIPELINE ── */}
-      {stage && (
-        <div style={S.pipeline}>
-
-          {/* Stage dots */}
-          <div style={S.stagesRow}>
-            {STAGES.map((s) => {
-              const status = getStageStatus(s.id);
-              return (
-                <div key={s.id} style={{ textAlign: "center" }}>
-                  <div style={S.dot(status, accent)}>{s.icon}</div>
-                  <div style={S.dotLabel(status, accent)}>{s.label}</div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Script */}
-          {results.script && (
-            <div style={S.scroll(accent)}>
-              <div style={S.scrollTitle(accent)}>📜 Script</div>
-              <div style={S.scrollContent}>{results.script}</div>
-            </div>
-          )}
-
-          {/* Storyboard */}
-          {results.storyboard && (
-            <div style={S.scroll("#D4A017")}>
-              <div style={S.scrollTitle("#D4A017")}>🎬 Storyboard</div>
-              <div style={S.scrollContent}>{results.storyboard}</div>
-            </div>
-          )}
-
-          {/* Video shots */}
-          {shots.length > 0 && (
-            <>
-              <div style={{ ...S.scrollTitle(accent), marginBottom: "10px" }}>
-                🎥 Video Generation
-                {stage === "video" && (
-                  <span style={{ color: "#D4A017", marginLeft: "8px" }}>
-                    — polling results…
-                  </span>
-                )}
-              </div>
-              <div style={S.shotGrid}>
-                {shots.map((shot, i) => {
-                  const url = videoUrls[i];
-                  const pending = i >= videoUrls.length;
-                  return (
-                    <div key={i} style={S.shotCard}>
-                      {url ? (
-                        <video
-                          style={S.shotVideo}
-                          src={url}
-                          controls
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                        />
-                      ) : (
-                        <div style={S.shotThumb(accent)}>
-                          {pending ? "🔄" : videoUrls[i] === null ? "⚠️" : "⏳"}
-                        </div>
-                      )}
-                      <div style={S.shotMeta}>
-                        <div style={{ color: accent, marginBottom: "2px" }}>
-                          Shot {i + 1}
-                          {url && <span style={{ color: "#4CAF7D" }}> ✓</span>}
-                        </div>
-                        <div style={{ fontSize: "10px", color: "#3A2E22" }}>
-                          {shot.slice(0, 60)}…
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {/* Final synopsis */}
-          {results.synopsis && (
-            <div style={S.finalCard(accent)}>
-              <div style={S.finalTitle(accent)}>
-                {era?.icon} Moremi Ajasoro — {era?.label}
-              </div>
-              <p style={S.finalText}>{results.synopsis}</p>
-              <div style={S.badge}>
-                Script ✓ · Storyboard ✓ · {successfulVideos}/{shots.length} videos · Synopsis ✓
-              </div>
-              <div>
-                <button style={S.resetBtn(accent)} onClick={reset}>
-                  ↩ Generate another era
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+    background: selected ? ERAS[eraId].surface
